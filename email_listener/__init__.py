@@ -23,7 +23,6 @@ Example:
 
 # Imports from other packages
 import email
-import html2text
 from imapclient import IMAPClient, SEEN
 import os
 # Imports from this package
@@ -136,7 +135,7 @@ class EmailListener:
             raise ValueError("server attribute must be type IMAPClient")
 
         # List containing the file paths of each file created for an email message
-        msg_dict = {}
+        msgs_list = []
 
         # Search for unseen messages
         messages = self.server.search(self.search_criteria)
@@ -145,10 +144,8 @@ class EmailListener:
             # Get the message
             email_message = email.message_from_bytes(message_data[b'RFC822'])
             # Get who the message is from
-            from_email = self.__get_from(email_message)
+            from_email, from_name = self.__get_from(email_message)
 
-            # Generate the dict key for this email
-            key = "{}_{}".format(uid, from_email)
             # Generate the value dictionary to be filled later
             val_dict = {}
 
@@ -156,7 +153,10 @@ class EmailListener:
             print("PROCESSING: Email UID = {} from {}".format(uid, from_email))
 
             # Add the subject
-            val_dict["Subject"] = self.__get_subject(email_message).strip()
+            val_dict["subject"] = self.__get_subject(email_message).strip()
+            val_dict["from_email"] = from_email
+            val_dict["from_name"] = from_name
+            val_dict["to"] = self.__get_to(email_message).strip()
 
             # If the email has multiple parts
             if email_message.is_multipart():
@@ -168,13 +168,13 @@ class EmailListener:
                 val_dict = self.__parse_singlepart_message(
                     email_message, val_dict)
 
-            msg_dict[key] = val_dict
+            msgs_list.append(val_dict)
 
             # If required, move the email, mark it as unread, or delete it
             self.__execute_options(uid, move, mark_unread, delete)
 
         # Return the dictionary of messages and their contents
-        return msg_dict
+        return msgs_list
 
     def __get_from(self, email_message):
         """Helper function for getting who an email message is from.
@@ -191,12 +191,15 @@ class EmailListener:
         from_list = email.utils.getaddresses(from_raw)
         if len(from_list[0]) == 1:
             from_email = from_list[0][0]
+            from_name = None
         elif len(from_list[0]) == 2:
             from_email = from_list[0][1]
+            from_name = from_list[0][0]
         else:
             from_email = "UnknownEmail"
+            from_name = None
 
-        return from_email
+        return from_email, from_name
 
     def __get_subject(self, email_message):
         """
@@ -209,6 +212,18 @@ class EmailListener:
         if subject is None:
             return "No Subject"
         return subject
+
+    def __get_to(self, email_message):
+        """
+
+        """
+
+        # Get the subject
+        to = email_message.get("To")
+        # If there isn't a subject
+        if to is None:
+            raise Exception('Could not find who this message is directed to')
+        return to
 
     def __parse_multipart_message(self, email_message, val_dict):
         """Helper function for parsing multipart email messages.
@@ -242,14 +257,12 @@ class EmailListener:
             # If the part is html text
             elif part.get_content_type() == 'text/html':
                 # Convert the body from html to plain text
-                val_dict["Plain_HTML"] = html2text.html2text(
-                    part.get_payload())
-                val_dict["HTML"] = part.get_payload()
+                val_dict["html"] = part.get_payload()
 
             # If the part is plain text
             elif part.get_content_type() == 'text/plain':
                 # Get the body
-                val_dict["Plain_Text"] = part.get_payload()
+                val_dict["text"] = part.get_payload()
 
         return val_dict
 
@@ -268,7 +281,7 @@ class EmailListener:
         """
 
         # Get the message body, which is plain text
-        val_dict["Plain_Text"] = email_message.get_payload()
+        val_dict["text"] = email_message.get_payload()
         return val_dict
 
     def __execute_options(self, uid, move, unread, delete):
