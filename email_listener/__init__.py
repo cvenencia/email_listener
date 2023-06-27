@@ -47,15 +47,20 @@ class EmailListener:
 
     """
 
-    def __init__(self, email, app_password, folder, attachment_dir):
+    def __init__(self, email, app_password, folder, attachment_dir, search_criteria="UNSEEN", mark_with_flags=[]):
         """Initialize an EmailListener instance.
 
         Args:
             email (str): The email to listen to.
             app_password (str): The password for the email.
-            folder (str): The email folder to listen in.
+            folder (str): The email folder to listen in. Can be 'INBOX' or
+                one of the constants from IMAPClient (SEEN, ALL, etc)
             attachment_dir (str): The file path to folder to save scraped
                 emails and attachments to.
+            search_criteria (str or list): Criteria to use to search emails.
+                Defaults to unseen emails.
+            mark_with_flags (list): Flags to mark emails after being processed.
+                Defaults to empty list.
 
         Returns:
             None
@@ -67,7 +72,8 @@ class EmailListener:
         self.folder = folder
         self.attachment_dir = attachment_dir
         self.server = None
-
+        self.search_criteria = search_criteria
+        self.mark_with_flags = mark_with_flags
 
     def login(self):
         """Logs in the EmailListener to the IMAP server.
@@ -82,8 +88,18 @@ class EmailListener:
 
         self.server = IMAPClient('imap.gmail.com')
         self.server.login(self.email, self.app_password)
-        self.server.select_folder(self.folder, readonly=False)
 
+        if self.folder.lower() == 'inbox':
+            folder = 'INBOX'
+        else:
+            folder = None
+            for folder_data in self.server.list_folders():
+                if self.folder in folder_data[0]:
+                    folder = folder_data[2]
+            if not folder:
+                raise TypeError(f'Invalid folder: {self.folder}')
+
+        self.server.select_folder(folder, readonly=False)
 
     def logout(self):
         """Logs out the EmailListener from the IMAP server.
@@ -99,14 +115,13 @@ class EmailListener:
         self.server.logout()
         self.server = None
 
-
-    def scrape(self, move=None, unread=False, delete=False):
+    def scrape(self, move=None, mark_unread=False, delete=False):
         """Scrape unread emails from the current folder.
 
         Args:
             move (str): The folder to move the emails to. If None, the emails
                 are not moved. Defaults to None.
-            unread (bool): Whether the emails should be marked as unread.
+            mark_unread (bool): Whether the emails should be marked as unread.
                 Defaults to False.
             delete (bool): Whether the emails should be deleted. Defaults to
                 False.
@@ -124,7 +139,7 @@ class EmailListener:
         msg_dict = {}
 
         # Search for unseen messages
-        messages = self.server.search("UNSEEN")
+        messages = self.server.search(self.search_criteria)
         # For each unseen message
         for uid, message_data in self.server.fetch(messages, 'RFC822').items():
             # Get the message
@@ -145,20 +160,21 @@ class EmailListener:
 
             # If the email has multiple parts
             if email_message.is_multipart():
-                val_dict = self.__parse_multipart_message(email_message, val_dict)
+                val_dict = self.__parse_multipart_message(
+                    email_message, val_dict)
 
             # If the message isn't multipart
             else:
-                val_dict = self.__parse_singlepart_message(email_message, val_dict)
+                val_dict = self.__parse_singlepart_message(
+                    email_message, val_dict)
 
             msg_dict[key] = val_dict
 
             # If required, move the email, mark it as unread, or delete it
-            self.__execute_options(uid, move, unread, delete)
+            self.__execute_options(uid, move, mark_unread, delete)
 
         # Return the dictionary of messages and their contents
         return msg_dict
-
 
     def __get_from(self, email_message):
         """Helper function for getting who an email message is from.
@@ -182,7 +198,6 @@ class EmailListener:
 
         return from_email
 
-
     def __get_subject(self, email_message):
         """
 
@@ -194,7 +209,6 @@ class EmailListener:
         if subject is None:
             return "No Subject"
         return subject
-
 
     def __parse_multipart_message(self, email_message, val_dict):
         """Helper function for parsing multipart email messages.
@@ -229,7 +243,7 @@ class EmailListener:
             elif part.get_content_type() == 'text/html':
                 # Convert the body from html to plain text
                 val_dict["Plain_HTML"] = html2text.html2text(
-                        part.get_payload())
+                    part.get_payload())
                 val_dict["HTML"] = part.get_payload()
 
             # If the part is plain text
@@ -238,7 +252,6 @@ class EmailListener:
                 val_dict["Plain_Text"] = part.get_payload()
 
         return val_dict
-
 
     def __parse_singlepart_message(self, email_message, val_dict):
         """Helper function for parsing singlepart email messages.
@@ -257,7 +270,6 @@ class EmailListener:
         # Get the message body, which is plain text
         val_dict["Plain_Text"] = email_message.get_payload()
         return val_dict
-
 
     def __execute_options(self, uid, move, unread, delete):
         """Loop through optional arguments and execute any required processing.
@@ -280,6 +292,9 @@ class EmailListener:
         if bool(unread):
             self.server.remove_flags(uid, [SEEN])
 
+        # Mark email with flags passed on creation
+        self.server.add_flags(uid, self.mark_with_flags)
+
         # If a move folder is specified
         if move is not None:
             try:
@@ -294,7 +309,6 @@ class EmailListener:
             # Move the email to the trash
             self.server.set_gmail_labels(uid, "\\Trash")
         return
-
 
     def listen(self, timeout, process_func=write_txt_file, **kwargs):
         """Listen in an email folder for incoming emails, and process them.
@@ -332,7 +346,6 @@ class EmailListener:
         while (get_time() < outer_timeout):
             self.__idle(process_func=process_func, **kwargs)
         return
-
 
     def __idle(self, process_func=write_txt_file, **kwargs):
         """Helper function, idles in an email folder processing incoming emails.
@@ -376,7 +389,8 @@ class EmailListener:
                 # Suspend the idling
                 self.server.idle_done()
                 # Process the new emails
-                msgs = self.scrape(move=move, unread=unread, delete=delete)
+                msgs = self.scrape(
+                    move=move, mark_unread=unread, delete=delete)
                 # Run the process function
                 process_func(self, msgs)
                 # Restart idling
@@ -384,4 +398,3 @@ class EmailListener:
         # Stop idling
         self.server.idle_done()
         return
-
