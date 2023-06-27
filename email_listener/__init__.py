@@ -25,6 +25,8 @@ Example:
 import email
 from imapclient import IMAPClient, SEEN
 import os
+from dateparser import parse
+import pytz
 # Imports from this package
 from .helpers import (
     calc_timeout,
@@ -157,6 +159,7 @@ class EmailListener:
             val_dict["from_email"] = from_email
             val_dict["from_name"] = from_name
             val_dict["to"] = self.__get_to(email_message).strip()
+            val_dict['date'] = self.__get_date(email_message)
 
             # If the email has multiple parts
             if email_message.is_multipart():
@@ -175,6 +178,11 @@ class EmailListener:
 
         # Return the dictionary of messages and their contents
         return msgs_list
+
+    def __get_date(self, email_message):
+        date_str = email_message.get("Date")
+        date = parse(date_str).astimezone(pytz.utc)
+        return date
 
     def __get_from(self, email_message):
         """Helper function for getting who an email message is from.
