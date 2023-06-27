@@ -310,13 +310,14 @@ class EmailListener:
             self.server.set_gmail_labels(uid, "\\Trash")
         return
 
-    def listen(self, timeout, process_func=write_txt_file, **kwargs):
+    def listen(self, timeout=None, process_func=write_txt_file, **kwargs):
         """Listen in an email folder for incoming emails, and process them.
 
         Args:
-            timeout (int or list): Either an integer representing the number
-                of minutes to timeout in, or a list, formatted as [hour, minute]
-                of the local time to timeout at.
+            timeout (int, list or None): Either an integer representing the number
+                of minutes to timeout in, a list, formatted as [hour, minute]
+                of the local time to timeout at, or None. If None, will listen
+                forever.
             process_func (function): A function called to further process the
                 emails. The function must take only the list of file paths
                 returned by the scrape function as an argument. Defaults to the
@@ -340,10 +341,21 @@ class EmailListener:
             raise ValueError("server attribute must be type IMAPClient")
 
         # Get the timeout value
-        outer_timeout = calc_timeout(timeout)
+        def should_continue(timeout):
+            'If no timeout is defined, listen forever, else return'
+            if timeout is None:
+                return True
+            else:
+                outer_timeout = calc_timeout(timeout)
+                return get_time() < outer_timeout
+
+        move = kwargs.get('move')
+        unread = bool(kwargs.get('unread'))
+        delete = bool(kwargs.get('delete'))
 
         # Run until the timeout is reached
-        while (get_time() < outer_timeout):
+        while (should_continue(timeout)):
+            self.__process_new_emails(move, unread, delete, process_func)
             self.__idle(process_func=process_func, **kwargs)
         return
 
@@ -388,13 +400,16 @@ class EmailListener:
             if (responses):
                 # Suspend the idling
                 self.server.idle_done()
-                # Process the new emails
-                msgs = self.scrape(
-                    move=move, mark_unread=unread, delete=delete)
-                # Run the process function
-                process_func(self, msgs)
+                self.__process_new_emails(move, unread, delete, process_func)
                 # Restart idling
                 self.server.idle()
         # Stop idling
         self.server.idle_done()
         return
+
+    def __process_new_emails(self, move, unread, delete, process_func):
+        # Process the new emails
+        msgs = self.scrape(
+            move=move, mark_unread=unread, delete=delete)
+        # Run the process function
+        process_func(self, msgs)
