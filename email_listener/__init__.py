@@ -176,9 +176,16 @@ class EmailListener:
             self.__execute_options(uid, move, mark_unread, delete)
 
     def __get_date(self, email_message):
-        date_str = email_message.get("Date")
-        date = parse(date_str).astimezone(pytz.utc)
-        return date
+        date_str: str | None = email_message.get("Date")
+        if not date_str:
+            return None
+        date_str = date_str.replace('(UTC)', '').strip()
+        try:
+            date = parse(date_str).astimezone(pytz.utc)
+            return date
+        except:
+            print(f'ERROR PARSING DATE: {date_str}')
+            return None
 
     def __get_from(self, email_message):
         """Helper function for getting who an email message is from.
