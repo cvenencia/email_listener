@@ -4,7 +4,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(
-    name='email_listener',
+    name='email_listener_custom',
     version='1.2',
     description='Listen in an email folder and process incoming emails.',
     long_description=long_description,
@@ -17,8 +17,8 @@ setup(
         'Programming Language :: Python :: 3.8',
         'Topic :: Communications :: Email',
     ],
-    url='https://github.com/njdreikosen/email_listener',
-    author='Noah Dreikosen',
+    url='https://github.com/cvenencia/email_listener',
+    author='Noah Dreikosen, Carlos Venencia',
     author_email='ndreikosen@gmail.com',
     license='GNU GPLv3',
     packages=['email_listener'],
@@ -29,4 +29,3 @@ setup(
         'pytest',
     ],
     zip_safe=False)
-

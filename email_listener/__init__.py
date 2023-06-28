@@ -116,7 +116,7 @@ class EmailListener:
         self.server.logout()
         self.server = None
 
-    def scrape(self, move=None, mark_unread=False, delete=False):
+    def scrape(self, move=None, mark_unread=False, delete=False, process_func=lambda x, y: None):
         """Scrape unread emails from the current folder.
 
         Args:
@@ -135,9 +135,6 @@ class EmailListener:
         # Ensure server is connected
         if type(self.server) is not IMAPClient:
             raise ValueError("server attribute must be type IMAPClient")
-
-        # List containing the file paths of each file created for an email message
-        msgs_list = []
 
         # Search for unseen messages
         messages = self.server.search(self.search_criteria)
@@ -160,6 +157,7 @@ class EmailListener:
             val_dict["from_name"] = from_name
             val_dict["to"] = self.__get_to(email_message).strip()
             val_dict['date'] = self.__get_date(email_message)
+            val_dict['id'] = uid
 
             # If the email has multiple parts
             if email_message.is_multipart():
@@ -171,13 +169,11 @@ class EmailListener:
                 val_dict = self.__parse_singlepart_message(
                     email_message, val_dict)
 
-            msgs_list.append(val_dict)
+            # Process message first, then execute the options
+            process_func(self, val_dict)
 
             # If required, move the email, mark it as unread, or delete it
             self.__execute_options(uid, move, mark_unread, delete)
-
-        # Return the dictionary of messages and their contents
-        return msgs_list
 
     def __get_date(self, email_message):
         date_str = email_message.get("Date")
@@ -340,9 +336,9 @@ class EmailListener:
                 of the local time to timeout at, or None. If None, will listen
                 forever.
             process_func (function): A function called to further process the
-                emails. The function must take only the list of file paths
-                returned by the scrape function as an argument. Defaults to the
-                example function write_txt_file in the email_processing module.
+                emails. The function must take the EmailListener and the dict
+                containing the data from the email. Defaults to the example
+                function write_txt_file in the email_processing module.
             **kwargs (dict): Additional arguments for processing the email.
                 Optional arguments include:
                     move (str): The folder to move emails to. If not set, the
@@ -430,7 +426,5 @@ class EmailListener:
 
     def __process_new_emails(self, move, unread, delete, process_func):
         # Process the new emails
-        msgs = self.scrape(
-            move=move, mark_unread=unread, delete=delete)
-        # Run the process function
-        process_func(self, msgs)
+        self.scrape(
+            move=move, mark_unread=unread, delete=delete, process_func=process_func)
