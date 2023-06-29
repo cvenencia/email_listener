@@ -144,6 +144,8 @@ class EmailListener:
             email_message = email.message_from_bytes(message_data[b'RFC822'])
             # Get who the message is from
             from_email, from_name = self.__get_from(email_message)
+            # Get who the message is for
+            to_email, to_name = self.__get_to(email_message).strip()
 
             # Generate the value dictionary to be filled later
             val_dict = {}
@@ -155,7 +157,8 @@ class EmailListener:
             val_dict["subject"] = self.__get_subject(email_message).strip()
             val_dict["from_email"] = from_email
             val_dict["from_name"] = from_name
-            val_dict["to"] = self.__get_to(email_message).strip()
+            val_dict["to_email"] = to_email
+            val_dict["to_name"] = to_name
             val_dict['date'] = self.__get_date(email_message)
             val_dict['id'] = uid
 
@@ -229,12 +232,18 @@ class EmailListener:
 
         """
 
-        # Get the subject
-        to = email_message.get("To")
-        # If there isn't a subject
-        if to is None:
-            raise Exception('Could not find who this message is directed to')
-        return to
+        to_raw = email_message.get_all('To', [])
+        to_list = email.utils.getaddresses(to_raw)
+        if len(to_list[0]) == 1:
+            to_email = to_list[0][0]
+            to_name = None
+        elif len(to_list[0]) == 2:
+            to_email = to_list[0][1]
+            to_name = to_list[0][0]
+        else:
+            to_email = None
+            to_name = None
+        return to_email, to_name
 
     def __parse_multipart_message(self, email_message, val_dict):
         """Helper function for parsing multipart email messages.
