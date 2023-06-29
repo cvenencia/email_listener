@@ -148,7 +148,7 @@ class EmailListener:
             to_email, to_name = self.__get_to(email_message)
 
             # Generate the value dictionary to be filled later
-            val_dict = {}
+            val_dict = {'filters': {}}
 
             # Display notice
             print("PROCESSING: Email UID = {} from {}".format(uid, from_email))
@@ -161,6 +161,9 @@ class EmailListener:
             val_dict["to_name"] = to_name
             val_dict['date'] = self.__get_date(email_message)
             val_dict['id'] = uid
+            val_dict['filters']['autoreply'] = self.__is_autoreply(
+                email_message)
+            val_dict['filters']['bounced'] = self.__is_bounced(email_message)
 
             # If the email has multiple parts
             if email_message.is_multipart():
@@ -177,6 +180,17 @@ class EmailListener:
 
             # If required, move the email, mark it as unread, or delete it
             self.__execute_options(uid, move, mark_unread, delete)
+
+    def __is_autoreply(self, email_message):
+        header = email_message.get('Auto-Submitted')  # Access the raw headers
+        if not header:
+            return False
+        header = header.lower()
+        return 'auto-replied' in header or 'auto-submitted' in header or 'auto-generated' in header
+
+    def __is_bounced(self, email_message):
+        header = email_message.get('X-Failed-Recipients')
+        return bool(header)
 
     def __get_date(self, email_message):
         date_str: str | None = email_message.get("Date")
