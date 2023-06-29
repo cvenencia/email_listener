@@ -145,7 +145,7 @@ class EmailListener:
             # Get who the message is from
             from_email, from_name = self.__get_from(email_message)
             # Get who the message is for
-            to_email, to_name = self.__get_to(email_message).strip()
+            to_email, to_name = self.__get_to(email_message)
 
             # Generate the value dictionary to be filled later
             val_dict = {}
