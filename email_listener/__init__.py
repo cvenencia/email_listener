@@ -48,7 +48,7 @@ class EmailListener:
 
     """
 
-    def __init__(self, email, app_password, folder, attachment_dir, search_criteria="UNSEEN", mark_with_flags=[]):
+    def __init__(self, email, app_password, folder, attachment_dir=None, search_criteria="UNSEEN", mark_with_flags=[]):
         """Initialize an EmailListener instance.
 
         Args:
@@ -56,7 +56,7 @@ class EmailListener:
             app_password (str): The password for the email.
             folder (str): The email folder to listen in. Can be 'INBOX' or
                 one of the constants from IMAPClient (SEEN, ALL, etc)
-            attachment_dir (str): The file path to folder to save scraped
+            attachment_dir (str or None): The file path to folder to save scraped
                 emails and attachments to.
             search_criteria (str or list): Criteria to use to search emails.
                 Defaults to unseen emails.
@@ -202,7 +202,7 @@ class EmailListener:
             return date
         except:
             print(f'ERROR PARSING DATE: {date_str}')
-            return None
+            return date_str
 
     def __get_from(self, email_message):
         """Helper function for getting who an email message is from.
@@ -277,7 +277,7 @@ class EmailListener:
         for part in email_message.walk():
             # If the part is an attachment
             file_name = part.get_filename()
-            if bool(file_name):
+            if self.attachment_dir and bool(file_name):
                 # Generate file path
                 file_path = os.path.join(self.attachment_dir, file_name)
                 file = open(file_path, 'wb')
