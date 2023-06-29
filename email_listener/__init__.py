@@ -23,6 +23,7 @@ Example:
 
 # Imports from other packages
 import email
+import re
 from imapclient import IMAPClient, SEEN
 import os
 from dateparser import parse
@@ -196,7 +197,8 @@ class EmailListener:
         date_str: str | None = email_message.get("Date")
         if not date_str:
             return None
-        date_str = date_str.replace('(UTC)', '').strip()
+        # Remove timezone description from the end. (UTC), (PDT), etc
+        date_str = re.sub(r' \(.+\)$', '', date_str)
         try:
             date = parse(date_str).astimezone(pytz.utc)
             return date
