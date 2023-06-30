@@ -23,6 +23,7 @@ Example:
 
 # Imports from other packages
 import email
+from email.message import Message
 import re
 from imapclient import IMAPClient, SEEN
 import os
@@ -261,7 +262,7 @@ class EmailListener:
             to_name = None
         return to_email, to_name
 
-    def __parse_multipart_message(self, email_message, val_dict):
+    def __parse_multipart_message(self, email_message: Message, val_dict):
         """Helper function for parsing multipart email messages.
 
         Args:
@@ -293,12 +294,12 @@ class EmailListener:
             # If the part is html text
             elif part.get_content_type() == 'text/html':
                 # Convert the body from html to plain text
-                val_dict["html"] = part.get_payload()
+                val_dict["html"] = part.get_payload(decode=True).decode()
 
             # If the part is plain text
             elif part.get_content_type() == 'text/plain':
                 # Get the body
-                val_dict["text"] = part.get_payload()
+                val_dict["text"] = part.get_payload(decode=True).decode()
 
         return val_dict
 
@@ -317,7 +318,7 @@ class EmailListener:
         """
 
         # Get the message body, which is plain text
-        val_dict["text"] = email_message.get_payload()
+        val_dict["text"] = email_message.get_payload(decode=True).decode()
         return val_dict
 
     def __execute_options(self, uid, move, unread, delete):
