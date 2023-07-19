@@ -35,6 +35,7 @@ from .helpers import (
     get_time,
 )
 from .email_processing import write_txt_file
+import quopri
 
 
 class EmailListener:
@@ -294,12 +295,14 @@ class EmailListener:
             # If the part is html text
             elif part.get_content_type() == 'text/html':
                 # Convert the body from html to plain text
-                val_dict["html"] = part.get_payload(decode=True).decode()
+                val_dict["html"] = quopri.decodestring(
+                    part.get_payload(decode=True)).decode()
 
             # If the part is plain text
             elif part.get_content_type() == 'text/plain':
                 # Get the body
-                val_dict["text"] = part.get_payload(decode=True).decode()
+                val_dict["text"] = quopri.decodestring(
+                    part.get_payload(decode=True)).decode()
 
         return val_dict
 
@@ -318,7 +321,8 @@ class EmailListener:
         """
 
         # Get the message body, which is plain text
-        val_dict["text"] = email_message.get_payload(decode=True).decode()
+        val_dict["text"] = quopri.decodestring(
+            email_message.get_payload(decode=True)).decode()
         return val_dict
 
     def __execute_options(self, uid, move, unread, delete):
