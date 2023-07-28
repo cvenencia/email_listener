@@ -24,6 +24,7 @@ Example:
 # Imports from other packages
 import email
 from email.header import decode_header
+from email.parser import BytesParser
 from email.message import Message
 import re
 from imapclient import IMAPClient, SEEN
@@ -145,7 +146,7 @@ class EmailListener:
         # For each unseen message
         for uid, message_data in self.server.fetch(messages, 'RFC822').items():
             # Get the message
-            email_message = email.message_from_bytes(message_data[b'RFC822'])
+            email_message = BytesParser().parsebytes(message_data[b'RFC822'])
             # Get who the message is from
             from_email, from_name = self.__get_from(email_message)
             # Get who the message is for
@@ -284,7 +285,7 @@ class EmailListener:
         """Helper function for parsing multipart email messages.
 
         Args:
-            email_message (email.message): The email message to parse.
+            email_message (email.Message): The raw email message to parse.
             val_dict (dict): A dictionary containing the message data from each
                 part of the message. Will be returned after it is updated.
 
@@ -296,6 +297,8 @@ class EmailListener:
 
         # For each part
         for part in email_message.walk():
+            charset = part.get_content_charset() or 'utf-8'
+            content_type = part.get_content_type()
             # If the part is an attachment
             file_name = part.get_filename()
             if self.attachment_dir and bool(file_name):
@@ -310,24 +313,24 @@ class EmailListener:
                 val_dict["attachments"] = attachment_list
 
             # If the part is html text
-            elif part.get_content_type() == 'text/html':
+            elif content_type == 'text/html':
                 # Convert the body from html to plain text
-                val_dict["html"] = quopri.decodestring(
-                    part.get_payload(decode=True)).decode()
+                val_dict["html"] = part.get_payload(
+                    decode=True).decode(charset)
 
             # If the part is plain text
-            elif part.get_content_type() == 'text/plain':
+            elif content_type == 'text/plain':
                 # Get the body
-                val_dict["text"] = quopri.decodestring(
-                    part.get_payload(decode=True)).decode()
+                val_dict["text"] = part.get_payload(
+                    decode=True).decode(charset)
 
         return val_dict
 
-    def __parse_singlepart_message(self, email_message, val_dict):
+    def __parse_singlepart_message(self, email_message: Message, val_dict):
         """Helper function for parsing singlepart email messages.
 
         Args:
-            email_message (email.message): The email message to parse.
+            email_message (email.Message): The email message to parse.
             val_dict (dict): A dictionary containing the message data from each
                 part of the message. Will be returned after it is updated.
 
@@ -338,8 +341,9 @@ class EmailListener:
         """
 
         # Get the message body, which is plain text
-        val_dict["text"] = quopri.decodestring(
-            email_message.get_payload(decode=True)).decode()
+        charset = email_message.get_content_charset() or 'utf-8'
+        val_dict["text"] = email_message.get_payload(
+            decode=True).decode(charset)
         return val_dict
 
     def __execute_options(self, uid, move, unread, delete):
