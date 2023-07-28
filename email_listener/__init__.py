@@ -23,6 +23,7 @@ Example:
 
 # Imports from other packages
 import email
+from email.header import decode_header
 from email.message import Message
 import re
 from imapclient import IMAPClient, SEEN
@@ -233,7 +234,21 @@ class EmailListener:
 
         return from_email, from_name
 
-    def __get_subject(self, email_message):
+    def __decode_header(self, header):
+        encoded_parts = header.split()
+
+        decoded_subject_parts = []
+        for part in encoded_parts:
+            decoded_part, charset = decode_header(part)[0]
+            if charset:
+                decoded_subject_parts.append(decoded_part.decode(charset))
+            else:
+                decoded_subject_parts.append(decoded_part)
+
+        decoded_header = ' '.join(decoded_subject_parts)
+        return decoded_header
+
+    def __get_subject(self, email_message: Message):
         """
 
         """
@@ -243,6 +258,8 @@ class EmailListener:
         # If there isn't a subject
         if subject is None:
             return "No Subject"
+        else:
+            subject = self.__decode_header(subject)
         return subject
 
     def __get_to(self, email_message):
