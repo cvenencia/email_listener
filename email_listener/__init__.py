@@ -37,7 +37,6 @@ from .helpers import (
     get_time,
 )
 from .email_processing import write_txt_file
-import quopri
 
 
 class EmailListener:
@@ -395,7 +394,7 @@ class EmailListener:
             self.server.set_gmail_labels(uid, "\\Trash")
         return
 
-    def listen(self, timeout=None, process_func=write_txt_file, **kwargs):
+    def listen(self, timeout=None, process_func=write_txt_file, new_messages_func=lambda: None, **kwargs):
         """Listen in an email folder for incoming emails, and process them.
 
         Args:
@@ -407,6 +406,8 @@ class EmailListener:
                 emails. The function must take the EmailListener and the dict
                 containing the data from the email. Defaults to the example
                 function write_txt_file in the email_processing module.
+            new_messages_func (function): A function called after processing all
+                new emails.
             **kwargs (dict): Additional arguments for processing the email.
                 Optional arguments include:
                     move (str): The folder to move emails to. If not set, the
@@ -440,11 +441,13 @@ class EmailListener:
 
         # Run until the timeout is reached
         while (should_continue(timeout)):
-            self.__process_new_emails(move, unread, delete, process_func)
-            self.__idle(process_func=process_func, **kwargs)
+            self.__process_new_emails(
+                move, unread, delete, process_func, new_messages_func)
+            self.__idle(process_func=process_func,
+                        new_messages_func=new_messages_func, **kwargs)
         return
 
-    def __idle(self, process_func=write_txt_file, **kwargs):
+    def __idle(self, process_func=write_txt_file, new_messages_func=lambda: None, ** kwargs):
         """Helper function, idles in an email folder processing incoming emails.
 
         Args:
@@ -485,14 +488,16 @@ class EmailListener:
             if (responses):
                 # Suspend the idling
                 self.server.idle_done()
-                self.__process_new_emails(move, unread, delete, process_func)
+                self.__process_new_emails(
+                    move, unread, delete, process_func, new_messages_func)
                 # Restart idling
                 self.server.idle()
         # Stop idling
         self.server.idle_done()
         return
 
-    def __process_new_emails(self, move, unread, delete, process_func):
+    def __process_new_emails(self, move, unread, delete, process_func, new_messages_func):
         # Process the new emails
         self.scrape(
             move=move, mark_unread=unread, delete=delete, process_func=process_func)
+        new_messages_func()
