@@ -121,6 +121,16 @@ class EmailListener:
         self.server.logout()
         self.server = None
 
+    def remove_flags_from_all_emails(self, flags: list[bytes]):
+        """Remove *flags* from all emails
+        """
+        # Ensure server is connected
+        if type(self.server) is not IMAPClient:
+            raise ValueError("Must login first")
+
+        all_emails = self.server.search()
+        self.server.remove_flags(all_emails, flags)
+
     def scrape(self, move=None, mark_unread=False, delete=False, process_func=lambda x, y: None):
         """Scrape unread emails from the current folder.
 
