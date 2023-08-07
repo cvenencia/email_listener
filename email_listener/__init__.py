@@ -233,11 +233,11 @@ class EmailListener:
         from_raw = email_message.get_all('From', [])
         from_list = email.utils.getaddresses(from_raw)
         if len(from_list[0]) == 1:
-            from_email = from_list[0][0]
+            from_email = self.__decode_header(from_list[0][0])
             from_name = None
         elif len(from_list[0]) == 2:
-            from_email = from_list[0][1]
-            from_name = from_list[0][0]
+            from_email = self.__decode_header(from_list[0][1])
+            from_name = self.__decode_header(from_list[0][0])
         else:
             from_email = "UnknownEmail"
             from_name = None
@@ -256,7 +256,9 @@ class EmailListener:
                 decoded_subject_parts.append(decoded_part)
 
         decoded_header = ' '.join(decoded_subject_parts)
-        return decoded_header
+        decoded_header = ''.join(
+            char for char in decoded_header if char.isprintable())
+        return decoded_header.strip()
 
     def __get_subject(self, email_message: Message):
         """
@@ -280,11 +282,11 @@ class EmailListener:
         to_raw = email_message.get_all('To', [])
         to_list = email.utils.getaddresses(to_raw)
         if len(to_list[0]) == 1:
-            to_email = to_list[0][0]
+            to_email = self.__decode_header(to_list[0][0])
             to_name = None
         elif len(to_list[0]) == 2:
-            to_email = to_list[0][1]
-            to_name = to_list[0][0]
+            to_email = self.__decode_header(to_list[0][1])
+            to_name = self.__decode_header(to_list[0][0])
         else:
             to_email = None
             to_name = None
