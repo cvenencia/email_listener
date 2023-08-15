@@ -3,9 +3,9 @@
 Example:
 
     # Create the listener
-    listener = EmailListener("example@email.com", "badpassword", "Inbox", "./files/")
+    listener = EmailListener("imap.gmail.com", "badpassword", "Inbox", "./files/")
     # Log the listener into the IMAP server
-    listener.login()
+    listener.login('test@gmail.com', 'badpassword')
     # Scrape emails from the folder without moving them
     listener.scrape()
     # Scrape emails from the folder, and move them to the "email_listener" folder
@@ -52,12 +52,11 @@ class EmailListener:
 
     """
 
-    def __init__(self, email, app_password, folder, attachment_dir=None, search_criteria="UNSEEN", mark_with_flags=[]):
+    def __init__(self, email_host: str, folder: str, attachment_dir=None, search_criteria="UNSEEN", mark_with_flags=[]):
         """Initialize an EmailListener instance.
 
         Args:
-            email (str): The email to listen to.
-            app_password (str): The password for the email.
+            email_host (str): host for the IMAP server (e.g. 'imap.google.com', 'outlook.office365.com')
             folder (str): The email folder to listen in. Can be 'INBOX' or
                 one of the constants from IMAPClient (SEEN, ALL, etc)
             attachment_dir (str or None): The file path to folder to save scraped
@@ -72,28 +71,14 @@ class EmailListener:
 
         """
 
-        self.email = email
-        self.app_password = app_password
+        self.email_host = email_host
         self.folder = folder
         self.attachment_dir = attachment_dir
         self.server = None
         self.search_criteria = search_criteria
         self.mark_with_flags = mark_with_flags
 
-    def login(self):
-        """Logs in the EmailListener to the IMAP server.
-
-        Args:
-            None
-
-        Returns:
-            None
-
-        """
-
-        self.server = IMAPClient('imap.gmail.com')
-        self.server.login(self.email, self.app_password)
-
+    def _select_folder(self):
         if self.folder.lower() == 'inbox':
             folder = 'INBOX'
         else:
@@ -105,6 +90,37 @@ class EmailListener:
                 raise TypeError(f'Invalid folder: {self.folder}')
 
         self.server.select_folder(folder, readonly=False)
+
+    def login(self, username, password):
+        """Logs in the EmailListener to the IMAP server.
+
+        Args:
+            username (str): email address.
+            password (str): app password.
+
+        Returns:
+            None
+
+        """
+
+        self.server = IMAPClient(self.email_host)
+        self.server.login(username, password)
+        self._select_folder()
+
+    def oauth2_login(self, username, access_token):
+        """Logs in the EmailListener to the IMAP server via OAUTH2.
+
+        Args:
+            username (str): email address.
+            access_token (str): token for authentication.
+        Returns:
+            None
+
+        """
+
+        self.server = IMAPClient(self.email_host)
+        self.server.oauth2_login(username, access_token)
+        self._select_folder()
 
     def logout(self):
         """Logs out the EmailListener from the IMAP server.
